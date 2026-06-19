@@ -220,6 +220,28 @@ func (d *Diange) getSource(cmd string) []string {
 	return sources
 }
 
+func isRoomAdmin(user *model.LiveRoomUser) bool {
+	// placeholder for room admin check
+	return user.Admin
+}
+
+func isSpecificUser(user *model.LiveRoomUser) bool {
+	// placeholder for specific user check
+	// user can add their logic here, e.g.
+	// specificUIDs := []string{"12345", "67890"}
+	// for _, uid := range specificUIDs {
+	//     if user.Uid == uid {
+	//         return true
+	//     }
+	// }
+	return false
+}
+
+func isCaptain(user *model.LiveRoomUser) bool {
+	// placeholder for captain check
+	return user.Privilege > 0
+}
+
 func (d *Diange) searchByProvider(provider, keywords string) ([]model.Media, error) {
 	resp, err := global.EventBus.Call(
 		events.CmdMiaosicSearch,
@@ -263,12 +285,22 @@ func (d *Diange) handleMessage(event *eventbus.Event) {
 	}
 
 	//check user max
-	if d.UserMax > 0 {
+	userMax := d.UserMax
+	if isRoomAdmin(message.User) {
+		userMax = 4
+	} else if isCaptain(message.User) {
+		userMax = 5
+	} else if isSpecificUser(message.User) {
+		userMax = 3
+	}
+
+	//check user max
+	if userMax > 0 {
 		userCount, ok := d.userCount.Load(message.User.Username)
 		if !ok {
 			userCount = 0
 		}
-		if userCount.(int) >= d.UserMax {
+		if userCount.(int) >= userMax {
 			d.log.Infof("User %s(%s) exceed max diange count, ignore", message.User.Username, message.User.Uid)
 			return
 		}

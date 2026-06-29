@@ -485,3 +485,45 @@ flowchart TD
 
 这样以后新增权限项时，能直接插入到统一流程里。
 
+## 12. 播放状态持久化
+
+### 12.1 目标
+
+关闭程序时自动保存当前播放状态，下次启动时恢复，实现无缝续播。
+
+### 12.2 规则
+
+- 关闭程序时保存当前歌曲和待播列表到 `./config/play_state.json`。
+- 启动时若存在保存文件，则恢复播放状态。
+- 恢复时先等待 10 秒初始延迟，再等待播放器就绪信号（PlayerPlayingUpdate.Removed=false），30 秒超时。
+- 播放器就绪后，将当前歌曲 + 待播列表一次性插入 PlayerPlaylist，设 Index=0，通过 PlayerPlayNextCmd 从当前歌曲开始续播。
+- 恢复完成后删除 play_state.json。
+- 运行时不做任何保存，只在关闭时保存。
+
+### 12.3 数据结构
+
+```json
+{
+  "current_song": { Media 对象 },
+  "pending_playlist": [ Media 对象列表 ],
+  "playlist_index": 0,
+  "saved_at": "ISO 8601 时间戳"
+}
+```
+
+### 12.4 实现要点
+
+- 新增文件 `internal/player/state_persist.go`。
+- 入口函数 `InitPlayStatePersistence()` 在 `internal/internal.go` 中调用（2 行改动）。
+- 通过 `PlayerPlayCmd` 事件追踪当前播放歌曲。
+- 关闭时 `SavePlayState()` 保存状态。
+- 日志前缀：`PlayState`。
+- 恢复时逐首打印待播歌曲详情（仅 verbose 模式）。
+
+### 12.5 已知问题与处理
+
+- **文件锁冲突**：保存时检查文件是否被占用，失败则跳过本次保存。
+- **恢复时序混乱**：Controller 可能在恢复前消费列表导致列表被清空——通过延迟等待播放器就绪 + `saveEnabled` 守卫解决。
+- **播放器未就绪**：通过 PlayerPlayingUpdate 信号检测播放器状态，避免恢复时播放器尚未初始化。
+
+

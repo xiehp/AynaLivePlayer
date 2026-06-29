@@ -163,3 +163,19 @@
 - 影响范围：播放状态仅在两处触发持久化——启动时延迟恢复、关闭时保存。运行时不再有任何磁盘 I/O
 - 是否需要重放补丁：是。原作者更新后需完整替换 state_persist.go
 - 回滚方式：还原 state_persist.go 到上一版本（即 "修复初始化阶段播放状态保存泛滥" 版本）
+
+## 2026-06-29：修复播放器就绪信号丢失导致恢复超时
+
+- 日期：2026-06-29
+- 目标：修复重启恢复时永远等待 30 秒超时的问题——歌曲已在 10 秒内开始播放，但 PlayerPlayingUpdate.Removed=false 信号在订阅建立前已发出，订阅建立后永远收不到
+- 变更内容：
+  - 将 readyCh 和 PlayerPlayingUpdate 订阅从 time.AfterFunc(10s) 内部提前到外部，在延迟期间即可捕获信号
+  - 延迟结束后先非阻塞 select 检查 channel 是否已有信号，有则直接恢复，无则进入 30 秒等待
+  - 初始延迟从 5 秒改为 10 秒，给播放器更充裕的初始化时间
+  - 更新 customization-plan.md 第 12 节规则描述
+- 涉及文件：
+  - internal/player/state_persist.go（修改：InitPlayStatePersistence 中订阅/等待逻辑重构）
+  - docs/customization-plan.md（修改：12.2 规则描述更新）
+- 影响范围：重启后恢复响应更快，不再因错过信号而空等 30 秒
+- 是否需要重放补丁：是。原作者更新后需完整替换 state_persist.go
+- 回滚方式：还原 state_persist.go 到前两版本

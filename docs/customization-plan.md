@@ -495,7 +495,7 @@ flowchart TD
 
 - 关闭程序时保存当前歌曲和待播列表到 `./config/play_state.json`。
 - 启动时若存在保存文件，则恢复播放状态。
-- 恢复时先等待 10 秒初始延迟，再等待播放器就绪信号（PlayerPlayingUpdate.Removed=false），30 秒超时。
+- 恢复时立即订阅 PlayerPlayingUpdate 捕获播放器就绪信号，然后延迟 10 秒执行恢复；若延迟期间已收到 Removed=false 信号则直接恢复，否则最多再等 30 秒。
 - 播放器就绪后，将当前歌曲 + 待播列表一次性插入 PlayerPlaylist，设 Index=0，通过 PlayerPlayNextCmd 从当前歌曲开始续播。
 - 恢复完成后删除 play_state.json。
 - 运行时不做任何保存，只在关闭时保存。

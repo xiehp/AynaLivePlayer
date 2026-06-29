@@ -29,8 +29,9 @@ var (
 )
 
 // InitPlayStatePersistence 启动时检查是否有上次的播放状态，有则恢复。
-// 先等待 10 秒初始延迟，然后订阅 PlayerPlayingUpdate 等待播放器就绪（Removed=false），
-// 30 秒超时后放弃等待。恢复时将保存的当前歌曲 + 待播列表一次性插入 PlayerPlaylist，
+// 立即订阅 PlayerPlayingUpdate 捕获 Removed=false 信号，然后延迟 10 秒执行恢复；
+// 若延迟期间已收到就绪信号则直接恢复，否则最多再等 30 秒。
+// 恢复时将保存的当前歌曲 + 待播列表一次性插入 PlayerPlaylist，
 // 设置 Index=0 并通过 PlayerPlayNextCmd 从当前歌曲开始续播。
 func InitPlayStatePersistence() {
 	log := global.Logger.WithPrefix("PlayState")
@@ -48,31 +49,37 @@ func InitPlayStatePersistence() {
 			currentSongLock.Unlock()
 		})
 
+	// 提前订阅 PlayerPlayingUpdate，避免 10s 延迟期间错过 Removed=false 信号
+	readyCh := make(chan struct{}, 1)
+	handlerName := "player.state_persist.restore_ready"
+
+	_ = global.EventBus.Subscribe("", events.PlayerPlayingUpdate, handlerName,
+		func(evnt *eventbus.Event) {
+			data := evnt.Data.(events.PlayerPlayingUpdateEvent)
+			if !data.Removed {
+				select {
+				case readyCh <- struct{}{}:
+				default:
+				}
+			}
+		})
+
 	log.Info("[Restore] scheduling delayed restore (initial delay: 10s)")
 	time.AfterFunc(10*time.Second, func() {
-		log.Info("[Restore] waiting for player to become ready...")
+		log.Info("[Restore] checking player readiness...")
 
-		// 问题1：等待 PlayerPlayingUpdate 中 Removed=false 信号
-		readyCh := make(chan struct{}, 1)
-		handlerName := "player.state_persist.restore_ready"
-
-		_ = global.EventBus.Subscribe("", events.PlayerPlayingUpdate, handlerName,
-			func(evnt *eventbus.Event) {
-				data := evnt.Data.(events.PlayerPlayingUpdateEvent)
-				if !data.Removed {
-					select {
-					case readyCh <- struct{}{}:
-					default:
-					}
-				}
-			})
-
-		// 等待播放器就绪信号或 30 秒超时
+		// 检查延迟期间是否已收到就绪信号；若未收到则等待最多 30s
 		select {
 		case <-readyCh:
-			log.Info("[Restore] player is ready, proceeding with restore")
-		case <-time.After(30 * time.Second):
-			log.Info("[Restore] timeout waiting for player ready (30s), proceeding anyway")
+			log.Info("[Restore] player ready signal already received during delay, proceeding with restore")
+		default:
+			log.Info("[Restore] no ready signal yet, waiting up to 30s...")
+			select {
+			case <-readyCh:
+				log.Info("[Restore] player is ready, proceeding with restore")
+			case <-time.After(30 * time.Second):
+				log.Info("[Restore] timeout waiting for player ready (30s), proceeding anyway")
+			}
 		}
 
 		_ = global.EventBus.Unsubscribe(events.PlayerPlayingUpdate, handlerName)

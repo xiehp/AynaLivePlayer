@@ -55,6 +55,17 @@ AynaLivePlayer 是一个用 Go 写的桌面程序，主要用途是接收 B 站�
 
 这里是界面层，负责把功能展示给用户。主界面在 [gui/gui.go](gui/gui.go)，它会创建窗口、页面标签、系统托盘和错误弹窗。
 
+主窗口包含 6 个标签页，各标签页在 `gui/gui.go` 的 `Initialize()` 中通过 `container.NewAppTabs` 创建，入口与源文件对应如下：
+
+| 标签页 | 入口调用 | 源文件 | 说明 |
+|--------|----------|--------|------|
+| 播放器 | `player.CreateView()` | [gui/views/player/player.go](gui/views/player/player.go) | 播放控制界面，同目录还包含 controller.go、handler.go、lyric.go、playlist.go、videoplayer.go |
+| 搜索 | `search.CreateView()` | [gui/views/search/search.go](gui/views/search/search.go) | 媒体搜索界面，同目录还包含 search_bar.go、search_list.go |
+| 直播间 | `liverooms.CreateView()` | [gui/views/liverooms/liverooms.go](gui/views/liverooms/liverooms.go) | 直播间连接管理界面，同目录还包含 selector.go |
+| 播放列表 | `playlists.CreateView()` | [gui/views/playlists/playlists.go](gui/views/playlists/playlists.go) | 播放列表管理界面 |
+| 播放历史 | `history.CreateView()` | [gui/views/history/view.go](gui/views/history/view.go) | 播放历史记录界面 |
+| 设置 | `configView.CreateView()` | [gui/views/config/config_basic.go](gui/views/config/config_basic.go) | 系统配置与插件设置界面，同目录还包含 config_layout.go |
+
 ### 3.5 pkg 和 plugin
 
 这两部分可以看成基础能力和扩展能力：

@@ -179,3 +179,18 @@
 - 影响范围：重启后恢复响应更快，不再因错过信号而空等 30 秒
 - 是否需要重放补丁：是。原作者更新后需完整替换 state_persist.go
 - 回滚方式：还原 state_persist.go 到前两版本
+
+## 2026-06-29：持久化函数收敛到 auto_actions.go
+
+- 日期：2026-06-29
+- 目标：将 player.InitPlayStatePersistence 和 player.SavePlayState 调用收敛到 auto_actions.go，internal.go 不再直接引用 player 包的持久化函数
+- 变更内容：
+  - auto_actions.go：InitAutoActions() 内部新增 player.InitPlayStatePersistence() 调用；新增 SaveAutoActions() 函数包装 player.SavePlayState()
+  - internal.go：Initialize() 中移除 player.InitPlayStatePersistence() 独立调用，仅保留 InitAutoActions()；Stop() 中 player.SavePlayState() 替换为 SaveAutoActions()
+  - internal.go 步骤编号重新排序：Step 5 统一为 InitAutoActions，移除 5b
+- 涉及文件：
+  - internal/auto_actions.go（修改：InitAutoActions 增加持久化调用，新增 SaveAutoActions）
+  - internal/internal.go（修改：移除 player.InitPlayStatePersistence 和 player.SavePlayState 独立调用）
+- 影响范围：播放状态持久化功能入口收敛，internal.go 不再直接依赖 player 持久化 API
+- 是否需要重放补丁：是。原作者更新后需在 internal.go 的 Initialize 和 Stop 中分别调用 InitAutoActions() 和 SaveAutoActions()
+- 回滚方式：还原 internal.go 和 auto_actions.go 到本次修改前版本

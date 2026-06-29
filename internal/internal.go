@@ -37,8 +37,8 @@ func Initialize() {
 	controller.Initialize()
 	global.Logger.Infof("[InitTimeline] Step 4: controller.Initialize done (+%v)", time.Since(startTime))
 
-	player.InitPlayStatePersistence()
-	global.Logger.Infof("[InitTimeline] Step 5: InitPlayStatePersistence done (+%v)", time.Since(startTime))
+	InitAutoActions()
+	global.Logger.Infof("[InitTimeline] Step 5: InitAutoActions done (+%v)", time.Since(startTime))
 
 	liveroom.Initialize()
 	global.Logger.Infof("[InitTimeline] Step 6: liveroom.Initialize done (+%v)", time.Since(startTime))
@@ -70,6 +70,6 @@ func Stop() {
 	liveroom.StopAndSave()
 	playlist.Close()
 	plugins.ClosePlugins()
-	player.SavePlayState()
+	SaveAutoActions()
 	player.StopPlayer()
 }

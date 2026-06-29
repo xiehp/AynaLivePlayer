@@ -514,10 +514,8 @@ flowchart TD
 ### 12.4 实现要点
 
 - 新增文件 `internal/player/state_persist.go`。
-- 入口函数 `InitPlayStatePersistence()` 在 `internal/internal.go` 中调用（2 行改动）。
+- 入口函数 `InitPlayStatePersistence()` 和 `SavePlayState()` 通过 `internal/auto_actions.go` 的 `InitAutoActions()` / `SaveAutoActions()` 间接调用，`internal.go` 不再直接依赖 player 持久化 API。
 - 通过 `PlayerPlayCmd` 事件追踪当前播放歌曲。
-- 关闭时 `SavePlayState()` 保存状态。
-- 日志前缀：`PlayState`。
 - 恢复时逐首打印待播歌曲详情（仅 verbose 模式）。
 
 ### 12.5 已知问题与处理

@@ -248,22 +248,24 @@ flowchart TD
 
 #### 规则
 
-- 最多尝试 3 次。
-- 每次间隔 2 分钟。
-- 3 次都失败后停止自动重连，并把状态交给界面或日志提示。
-- 重连成功后恢复消息接收。
+- 每 5 分钟定时巡检所有直播间。
+- 对勾选了「自动连接」且当前处于断开状态的房间，执行重连。
+- 重连操作：先 Disconnect 再 Sleep 5s 再 Connect（SDK 要求异常断开后必须先断开才能重连）。
+- 不设重试上限，只要房间仍勾选自动连接且处于断开状态，就会持续尝试。
+- 手动点击连接按钮时同样走 Disconnect → Sleep 5s → Connect 流程。
 
-#### 建议补充的状态
+#### 架构
 
-- 当前是否处于重连中。
-- 当前重连第几次。
-- 最近一次断开原因。
+- `internal/auto_actions.go`：启动 5 分钟 ticker，调用 `liveroom.ReconnectAutoRooms()`。
+- `internal/liveroom/reconnect_simple.go`：`ReconnectAutoRooms()` 遍历房间，`reconnectAfterDelay()` 执行预断开 + 重连。
+- `internal/liveroom/liveroom.go`：connect handler 调用 `reconnectAfterDelay()`（1 行改动）；StopAndSave 中 `OnStatusChange(nil)` 防止退出时触发 GUI 更新报错（1 行改动）。
+- `core/events/liveroom.go`：无改动。
 
-#### 需要后续实现的点
+#### 日志
 
-- 断开事件检测。
-- 重连调度器。
-- 重连失败后的通知。
+- 定时巡检触发：`auto reconnect: {房间ID}`
+- 重连各阶段：`reconnect: disconnecting/waiting/connecting {房间ID}`
+- 成功/失败：`reconnect: connect {房间ID} succeeded/failed: {err}`
 
 ### 9.2 权限分类
 

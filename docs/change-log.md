@@ -44,6 +44,40 @@
   - events/liveroom.go 中新增事件常量与结构体
 - 回滚方式：删除 reconnect.go，还原 liveroom.go 与 events/liveroom.go 中被修改的段落
 
+## 2026-06-29：重连功能简化为定时巡检
+
+- 日期：2026-06-29
+- 目标：删除复杂状态机，用 5 分钟 ticker 定时巡检替代重连调度器
+- 变更内容：
+  - 删除 reconnect.go（原 ReconnectScheduler 状态机全部移除）
+  - 新增 reconnect_simple.go：reconnectAfterDelay()（Disconnect → Sleep 5s → Connect）和 ReconnectAutoRooms()（遍历 AutoConnect 且 Status=false 的房间）
+  - auto_actions.go：InitAutoActions() 中启动 5 分钟 ticker 调用 ReconnectAutoRooms()，SaveAutoActions() 中停止 ticker
+  - liveroom.go：删除 scheduler 字段、scheduler.Stop() 调用、OnStatusChange 内调度器调用；connect handler 改用 reconnectAfterDelay() 替代直接 Connect()
+  - core/events/liveroom.go：完全还原，移除 LiveRoomReconnectGiveUp 事件
+- 涉及文件：
+  - internal/liveroom/reconnect.go（已删除）
+  - internal/liveroom/reconnect_simple.go（新增）
+  - internal/liveroom/liveroom.go（修改：简化，仅 connect handler 1 行改动 + StopAndSave 1 行改动）
+  - internal/auto_actions.go（修改：ticker 启停）
+  - core/events/liveroom.go（修改：完全还原）
+  - docs/customization-plan.md（修改：§9.1 更新为简化方案）
+- 影响范围：重连逻辑大幅简化；不设重试上限，只要房间勾选自动连接且断开就持续重连；不再发布 LiveRoomReconnectGiveUp 事件
+- 是否需要重放补丁：是。原作者更新后需重新应用 liveroom.go 和 auto_actions.go 改动，并放回 reconnect_simple.go
+- 回滚方式：还原 liveroom.go 和 events/liveroom.go 到原始版本，删除 reconnect_simple.go，放回 reconnect.go
+
+## 2026-06-29：修复退出时 Fyne 线程报错
+
+- 日期：2026-06-29
+- 目标：修复关闭程序时 StopAndSave 触发 OnStatusChange → GUI fyne.Do 报错（主循环已停）
+- 变更内容：
+  - StopAndSave 中 Disconnect() 前增加 `r.room.OnStatusChange(nil)`，摘除 SDK 回调
+  - 摘除回调后 Disconnect 不再触发 OnStatusChange，避免 GUI 更新报错
+- 涉及文件：
+  - internal/liveroom/liveroom.go（修改：StopAndSave 方法增加 1 行）
+- 影响范围：正常退出不再报 Fyne 线程错误；不影响任何业务逻辑
+- 是否需要重放补丁：是。原作者更新后需重新插入此行
+- 回滚方式：删除 StopAndSave 中的 `r.room.OnStatusChange(nil)` 行
+
 ## 2026-06-26：播放状态持久化
 
 - 日期：2026-06-26
@@ -78,6 +112,21 @@
 - 涉及文件：
   - internal/liveroom/liveroom.go（修改：连接分支增加预断开调用）
 - 影响范围：用户手动点击连接时的行为；不影响断线重连调度器
+
+## 2026-06-29：重试参数调整
+
+- 日期：2026-06-29
+- 目标：将断线重试参数从"每 2 分钟重试 3 次"调整为"每 5 分钟重试 10 次"
+- 变更内容：
+  - defaultMaxRetries: 3 → 10
+  - defaultRetryInterval: 2 min → 5 min
+- 涉及文件：
+  - internal/liveroom/reconnect.go（修改：常量定义与结构体注释）
+  - docs/change-log.md（本条记录）
+  - docs/customization-plan.md（§9.1 规则描述）
+- 影响范围：断线重连总耗时从最多 6 分钟变为最多 50 分钟
+- 是否需要重放补丁：否（仅常量变更，原作者更新后重新改回即可）
+- 回滚方式：还原两个常量为 3 和 2 * time.Minute
 - 是否需要重放补丁：是。原作者更新后需在连接分支 Connect() 前重新插入 Disconnect() 调用
 - 回滚方式：删除连接分支中的 `room.room.Disconnect()` 行
 

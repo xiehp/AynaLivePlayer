@@ -8,10 +8,11 @@ import (
 	"AynaLivePlayer/pkg/eventbus"
 	"AynaLivePlayer/pkg/logger"
 	"errors"
+	"sort"
+
 	liveroomsdk "github.com/AynaLivePlayer/liveroom-sdk"
 	"github.com/AynaLivePlayer/liveroom-sdk/provider/openblive"
 	"github.com/AynaLivePlayer/liveroom-sdk/provider/webdm"
-	"sort"
 )
 
 type liveroom struct {
@@ -39,6 +40,7 @@ func Initialize() {
 func StopAndSave() {
 	log.Infof("Stop and save live rooms")
 	for _, r := range liveRooms {
+		r.room.OnStatusChange(nil)
 		log.Infof("Disconnect room %s: %v", r.room.Config().Identifier(), r.room.Disconnect())
 	}
 	liveroomConfigs := make([]model.LiveRoom, 0)
@@ -154,7 +156,7 @@ func registerHandlers() {
 			}
 			var err error
 			if data.SetConnect {
-				err = room.room.Connect()
+				err = reconnectAfterDelay(room.room)
 			} else {
 				err = room.room.Disconnect()
 			}

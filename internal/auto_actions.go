@@ -4,6 +4,7 @@ import (
 	"AynaLivePlayer/core/events"
 	"AynaLivePlayer/global"
 	"AynaLivePlayer/gui/gctx"
+	"AynaLivePlayer/internal/liveroom"
 	"AynaLivePlayer/internal/player"
 	"time"
 )
@@ -14,6 +15,7 @@ import (
 func InitAutoActions() {
 	player.InitPlayStatePersistence()
 	autoOpenPlayerWindow()
+	autoReconnectRooms()
 }
 
 // SaveAutoActions 程序退出前保存所有定制功能的状态。
@@ -22,7 +24,6 @@ func SaveAutoActions() {
 }
 
 // autoOpenPlayerWindow 初始化完成后延迟 10 秒自动打开底部「播放器」小窗。
-// 效果等同于点击底部「播放器」按钮。
 func autoOpenPlayerWindow() {
 	log := global.Logger.WithPrefix("AutoActions")
 	log.Info("[AutoPlayerWindow] scheduling auto-open 10s after init")
@@ -34,4 +35,16 @@ func autoOpenPlayerWindow() {
 			events.GUISetPlayerWindowOpenCmdEvent{SetOpen: true},
 		)
 	})
+}
+
+// autoReconnectRooms 每 5 分钟对勾选自动连接且已断开的直播间执行重连。
+func autoReconnectRooms() {
+	log := global.Logger.WithPrefix("AutoActions")
+	log.Info("[AutoReconnect] starting reconnect timer (interval: 5min)")
+	ticker := time.NewTicker(1 * time.Minute)
+	go func() {
+		for range ticker.C {
+			liveroom.ReconnectAutoRooms()
+		}
+	}()
 }
